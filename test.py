@@ -51,55 +51,108 @@ print(word2phones(['z','4','3'], prondict))
 
 def concatAnyHMM(hmmmodels, namelist):
     N = len(namelist)
+    # Array which conctain the idex of the start of a new phone
+    cumulLen = [0 for i in range(N)]
+    totalLen = 0
+    for i in range(N):
+        cumulLen[i] = totalLen
+        totalLen += len(hmmmodels[namelist[i]]['startprob'])-1
+    totalLen += 1
     word = {}
     word['name']="I dont know"
-    word['startprob'] = [0 for i in range(3 * (N-1) + 4)]
-    word['means'] = [[0 for j in range(13)] for i in range(3*N)]
-    word['covars'] = [[0 for j in range(13)] for i in range(3*N)]
-
+    word['startprob'] = [0 for i in range(totalLen)]
+    word['means'] = [[0 for j in range(13)] for i in range(totalLen)]
+    word['covars'] = [[0 for j in range(13)] for i in range(totalLen)]
+    word['transmat'] = [[0 for j in range(totalLen)] for i in range(totalLen)]
     #compute the startprob
     ## TO CHECK
     ## not sure what should append if there is more than 2 phones
     retenu = 1.0
     for i in range(N):
-        word['startprob'][3*i] = hmmmodels[namelist[i]]['startprob'][0] * retenu
-        word['startprob'][3*i+1] = hmmmodels[namelist[i]]['startprob'][1] * retenu
-        word['startprob'][3*i+2] = hmmmodels[namelist[i]]['startprob'][2] * retenu
-        retenu  = retenu * hmmmodels[namelist[i]]['startprob'][3]
+        for j in range(len(hmmmodels[namelist[i]]['startprob'])-1):
+            word['startprob'][cumulLen[i]+j] = hmmmodels[namelist[i]]['startprob'][j] * retenu
+        retenu  = retenu * hmmmodels[namelist[i]]['startprob'][-1]
     word['startprob'][-1] = retenu
-
+                       
     
     #compute means and covars
     ## TO CHECK:
     ## I don't know how to concat the means and the covars, not discribed in the document
     ## For now it is the old way to concat
     for i in range(N):
-        for j in range(13):
-            word['means'][3*i][j] = hmmmodels[namelist[i]]['means'][0][j]
-            word['covars'][3*i][j] = hmmmodels[namelist[i]]['covars'][0][j]
-                        
-        for j in range(13):
-            word['means'][3*i+1][j] = hmmmodels[namelist[i]]['means'][1][j]
-            word['covars'][3*i+1][j] = hmmmodels[namelist[i]]['covars'][1][j]
-
-        for j  in range(13):
-            word['means'][3*i+2][j] = hmmmodels[namelist[i]]['means'][2][j]
-            word['covars'][3*i+2][j] = hmmmodels[namelist[i]]['covars'][2][j]
-
+        for k in range(len(hmmmodels[namelist[i]]['startprob'])-1):
+                for j in range(13):
+                       word['means'][cumulLen[i]+k][j] = hmmmodels[namelist[i]]['means'][k][j]
+                       word['covars'][cumulLen[i]+k][j] = hmmmodels[namelist[i]]['covars'][k][j]
+                       
     #compute transmat
     ## TO DO
+    for i in range(N):
+        # Fill the square unchanged
+        nbState = len(hmmmodels[namelist[i]]['startprob'])-1
+        for j in range(nbState):
+            for k in range(nbState):
+                word['transmat'][cumulLen[i] + j][cumulLen[i]+k] =  hmmmodels[namelist[i]]['transmat'][j][k]
+
+        for k in range(nbState):
+            retenu = [hmmmodels[namelist[i]]['transmat'][j][-1] for j in range(nbState)]
+            for j in range(i+1,N):
+                for l in range(len(hmmmodels[namelist[j]]['startprob'])-1):
+                    word['transmat'][cumulLen[i]+k][cumulLen[j]+l] = retenu[k] * hmmmodels[namelist[j]]['startprob'][l]
+                # update retenu
+                for m in range(nbState):
+                    retenu[m] = retenu[m] * hmmmodels[namelist[j]]['startprob'][-1]
+            word['transmat'][cumulLen[i] + k][-1] = retenu[k]
+
+    word['transmat'][-1][-1] = 1.0    
     return word
 
 
-dicoTest = {}
-dicoTest['1'] = {}
-dicoTest['2'] = {}
-dicoTest['1']['means'] = [[1.0 for i in range(13)] for j in range(3)]
-dicoTest['1']['covars'] =  [[1.0 for i in range(13)] for j in range(3)]
-dicoTest['1']['startprob'] = [1.0, 1.25,1.50,2.0]
-dicoTest['2']['means'] =  [[2.0 for i in range(13)] for j in range(3)]
-dicoTest['2']['covars'] =  [[2.0 for i in range(13)] for j in range(3)]
-dicoTest['2']['startprob'] = [1.0, 1.25,1.50,2.0]
+# TEST pour concatAllHMM
+dicoTestSubject = {}
+dicoTestSubject['1'] = {}
+dicoTestSubject['2'] = {}
+dicoTestSubject['3'] = {}
+dicoTestSubject['1']['means'] = [[1.0 for i in range(13)] for j in range(3)]
+dicoTestSubject['1']['covars'] =  [[1.0 for i in range(13)] for j in range(3)]
+dicoTestSubject['1']['startprob'] = [1,0,0,0]
+dicoTestSubject['2']['means'] =  [[2.0 for i in range(13)] for j in range(3)]
+dicoTestSubject['2']['covars'] =  [[2.0 for i in range(13)] for j in range(3)]
+dicoTestSubject['2']['startprob'] = [0.4,0.6]
+dicoTestSubject['3']['means'] =  [[2.0 for i in range(13)] for j in range(3)]
+dicoTestSubject['3']['covars'] =  [[2.0 for i in range(13)] for j in range(3)]
+dicoTestSubject['3']['startprob'] = [1,0,0,0]
+dicoTestSubject['1']['transmat'] = [[0.5,0.5,0,0],
+                                    [0,0.5,0.5,0],
+                                    [0,0,0.3,0.7],
+                                    [0,0,0,1]]
+dicoTestSubject['3']['transmat'] = [[0.25,0.75,0,0],
+                                    [0,0.25,0.75,0],
+                                    [0,0,0.25,0.75],
+                                    [0,0,0,1]]
+dicoTestSubject['2']['transmat'] = [[0.20,0.8],
+                                    [0,1.0]]
 
-print(concatAnyHMM(dicoTest, ['1', '2', '1'])['startprob'])
+
+
+
+wordTest  = concatAnyHMM(phoneHMMs, ['sil', 'ow', 'sil'])
+#wordTest = concatAnyHMM(dicoTestSubject, ['1','2','3'])
+print("check that the intit proba is equal to 1")
+print(np.sum(wordTest['startprob']) == 1)
+sumTot = 0.0
+N = len(wordTest['transmat'])
+for i in range(N):
+    sumTot += np.sum(wordTest['transmat'][i])
+#print("les deux nombres suivants doivent etre egaux")
+print(sumTot)
+print(N)
+
+#print(wordTest['startprob'])
+#print(wordTest['transmat'])
+
+
+
+
+
 
