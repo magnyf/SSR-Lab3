@@ -2,8 +2,10 @@ import numpy as np
 import matplotlib.pyplot as pl
 from math import log, exp, fabs
 import collections
-import tools2
 import copy
+import lab1
+import lab2
+import lab3_tools
 from sklearn.mixture import *
 
 phoneHMMs = np.load('lab2_models.npz')['phoneHMMs'].item()
@@ -31,7 +33,7 @@ stateList = [ph + '_' + str(id) for ph in phones for id in range(nstates[ph])]
 #print(stateList.index('ay_2'))
 
 
-def word2phones(wordList, pronDict, addSilence = True, addShortPause = False):
+def words2phones(wordList, pronDict, addSilence = True, addShortPause = False):
     newPhone = np.array([])
     if addSilence:
         newPhone =np.concatenate((newPhone, np.array(['sil'])), axis = 0)
@@ -45,7 +47,7 @@ def word2phones(wordList, pronDict, addSilence = True, addShortPause = False):
 
 
 
-print(word2phones(['z','4','3'], prondict))
+print(words2phones(['z','4','3'], prondict))
 
 
 
@@ -153,6 +155,33 @@ print(N)
 
 
 
+###########
+filename = 'tidigits/disc_4.1.1/tidigits/train/man/nw/z43a.wav'
+samples, samplingrate = lab3_tools.loadAudio(filename)
+lmfcc = lab1.mfcc(samples)
+wordTrans = list(lab3_tools.path2info(filename)[2])
+print(wordTrans)
+#should be ['z', '4', '3']
 
+phoneTrans = words2phones(wordTrans, prondict, addShortPause=False)
+print(phoneTrans)
+#should be ['sil', 'z', 'iy', 'r', 'ow', 'f', 'ao', 'r', 'th', 'r', 'iy', 'sil']
 
+stateTrans = [phone + '_' + str(stateid) for phone in phoneTrans 
+for stateid in range(nstates[phone])]
+print(stateTrans)
 
+wordHMMs = concatAnyHMM(phoneHMMs, phoneTrans)
+
+obsloglik =  lab2.log_multivariate_normal_density_diag(np.array(lmfcc), 
+       np.array(wordHMMs['means']), 
+       np.array(wordHMMs['covars']))
+pi = wordHMMs['startprob']
+concatMat = wordHMMs['transmat']
+
+viterbiState = lab2.viterbi(obsloglik, lab2.log_inf(pi), lab2.log_inf(concatMat)
+)[1]
+
+viterbiStateTrans = [(stateTrans)[x] for x in viterbiState[:-1]]
+
+lab3_tools.frames2trans(viterbiStateTrans, outfilename='z43a.lab')
