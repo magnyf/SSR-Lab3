@@ -3,6 +3,7 @@ import os
 import matplotlib.pyplot as pl
 from sklearn.mixture import *
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 def path2info(path):
     """
@@ -19,14 +20,28 @@ def path2info(path):
     repetition = filename[-5]
     return gender, speakerID, digits, repetition
 
+phoneHMMs = np.load('lab2_models.npz')['phoneHMMs'].item()
+phones = sorted(phoneHMMs.keys())
+nstates = {phone: phoneHMMs[phone]['means'].shape[0] for phone in phones}
+stateList = [ph + '_' + str(id) for ph in phones for id in range(nstates[ph])]
 
+## Whole datasets
 traindata = np.load('traindata.npz')['traindata']
-
 testdata = np.load('testdata.npz')['testdata']
 
 ### Smaller sets to improve speed
 # traindata = np.load('traindata.npz')['traindata'][:1000]
 # testdata = np.load('testdata.npz')['testdata'][:1000]
+
+
+### To save memory it was better to save the index rather than the name of the state,
+## I didn't do it when generating the file so I fix this here
+## TODO save the file again after the changes to save time afterwards
+
+for x in traindata:
+    x['targets'] = [stateList.index(y) for y in x['targets']]
+for x in testdata:
+    x['targets'] = [stateList.index(y) for y in x['targets']]
 
 ################
 ### TRAINING SET
@@ -222,3 +237,38 @@ for i in range(len(mspec_test_x)):
 
     dmspec_test_x += [tempMspec]
     dlmfcc_test_x += [tempLmfcc]
+
+
+#################
+# Standardisation
+
+## la plus simple, sur l'ensemble du dataset
+scaler_lmfcc = StandardScaler()
+scaler_dlmfcc = StandardScaler()
+scaler_mspec = StandardScaler()
+scaler_dmspec = StandardScaler()
+
+lmfcc_train_x = scaler_lmfcc.fit_transform(lmfcc_train_x)
+dlmfcc_train_x = scaler_dlmfcc.fit_transform(dlmfcc_train_x)
+mspec_train_x = scaler_mspec.fit_transform(mspec_train_x)
+dmspec_train_x = scaler_dmspec.fit_transform(dmspec_train_x)
+
+## test to see if the mean and variance are normalized
+# scalerTest_lmfcc = StandardScaler()
+# scalerTest_lmfcc.fit(lmfcc_train_x)
+# print(scalerTest_lmfcc.mean_)
+# print(scalerTest_lmfcc.var_)
+
+
+#### Format change to use Keras and a GPU
+
+lmfcc_train_x = lmfcc_train_x.astype('float32')
+dlmfcc_train_x = dlmfcc_train_x.astype('float32')
+mspec_train_x = mspec_train_x.astype('float32')
+dmspec_train_x = dmspec_train_x.astype('float32')
+
+output_dim = len(stateList)
+
+train_y = np_utils.to_categorical(train_y, output_dim)
+val_y = np_utils.to_categorical(val_y, output_dim)
+test_y = np_utils.to_categorical(test_y, output_dim)
