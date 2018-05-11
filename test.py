@@ -163,7 +163,7 @@ wordTrans = list(lab3_tools.path2info(filename)[2])
 print(wordTrans)
 #should be ['z', '4', '3']
 
-phoneTrans = words2phones(wordTrans, prondict, addShortPause=False)
+phoneTrans = words2phones(wordTrans, prondict, addShortPause=True)
 print(phoneTrans)
 #should be ['sil', 'z', 'iy', 'r', 'ow', 'f', 'ao', 'r', 'th', 'r', 'iy', 'sil']
 
@@ -185,3 +185,70 @@ viterbiState = lab2.viterbi(obsloglik, lab2.log_inf(pi), lab2.log_inf(concatMat)
 viterbiStateTrans = [(stateTrans)[x] for x in viterbiState[:-1]]
 
 lab3_tools.frames2trans(viterbiStateTrans, outfilename='z43a.lab')
+
+
+def forcedAlignment(lmfcc, phoneHMMs, phoneTrans):
+    stateTrans = [phone + '_' + str(stateid) for phone in phoneTrans 
+    for stateid in range(nstates[phone])]
+
+    wordHMMs = concatAnyHMM(phoneHMMs, phoneTrans)
+
+    obsloglik =  lab2.log_multivariate_normal_density_diag(np.array(lmfcc), 
+           np.array(wordHMMs['means']), 
+           np.array(wordHMMs['covars']))
+    pi = wordHMMs['startprob']
+    concatMat = wordHMMs['transmat']
+
+    viterbiState = lab2.viterbi(obsloglik, lab2.log_inf(pi), lab2.log_inf(concatMat)
+    )[1]
+
+    viterbiStateTrans = [(stateTrans)[x] for x in viterbiState[:-1]]
+
+    return viterbiStateTrans
+
+
+############### 4.3
+
+# import os
+# traindata = []
+# for root, dirs, files in os.walk('tidigits/disc_4.1.1/tidigits/train'):
+#     print(root)
+#     for file in files:
+#         if file.endswith('.wav'):
+#             filename = os.path.join(root, file)
+#             samples, samplingrate = lab3_tools.loadAudio(filename)
+#             lmfcc = lab1.mfcc(samples)
+#             mspec = lab1.mspec(samples)
+#             wordTrans = list(lab3_tools.path2info(filename)[2])
+#             phoneTrans = words2phones(wordTrans, prondict, addShortPause=True)
+#             targets = forcedAlignment(lmfcc, phoneHMMs, phoneTrans)
+
+#             traindata.append({'filename': filename, 'lmfcc': lmfcc,
+#             'mspec': mspec, 'targets': targets})
+
+# np.savez('traindata.npz', traindata=traindata)
+
+traindata = np.load('traindata.npz')['traindata']
+
+# print(len(traindata))
+
+# import os
+# testdata = []
+# for root, dirs, files in os.walk('tidigits/disc_4.2.1/tidigits/test'):
+#     print(root)
+#     for file in files:
+#         if file.endswith('.wav'):
+#             filename = os.path.join(root, file)
+#             samples, samplingrate = lab3_tools.loadAudio(filename)
+#             lmfcc = lab1.mfcc(samples)
+#             mspec = lab1.mspec(samples)
+#             wordTrans = list(lab3_tools.path2info(filename)[2])
+#             phoneTrans = words2phones(wordTrans, prondict, addShortPause=True)
+#             targets = forcedAlignment(lmfcc, phoneHMMs, phoneTrans)
+
+#             testdata.append({'filename': filename, 'lmfcc': lmfcc,
+#             'mspec': mspec, 'targets': targets})
+
+# np.savez('testdata.npz', testdata=testdata)
+
+testdata = np.load('testdata.npz')['testdata']
