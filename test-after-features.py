@@ -24,6 +24,10 @@ traindata = np.load('traindata.npz')['traindata']
 
 testdata = np.load('testdata.npz')['testdata']
 
+### Smaller sets to improve speed
+# traindata = np.load('traindata.npz')['traindata'][:1000]
+# testdata = np.load('testdata.npz')['testdata'][:1000]
+
 ################
 ### TRAINING SET
 ################
@@ -181,3 +185,40 @@ for i in range(len(listSpeakersTrainFemale)):
 print(len(mspec_test_x))
 print(len(lmfcc_test_x))
 print(len(test_y))
+
+
+
+############
+## Dynamic Features
+############
+
+dmspec_train_x = []
+dlmfcc_train_x = []
+dmspec_test_x = []
+dlmfcc_test_x = []
+
+for i in range(len(mspec_train_x)):
+    tempMspec = []
+    tempLmfcc = []
+    n = len(mspec_train_x)
+    for j in range(-3, 4):
+        tempMspec += list(mspec_train_x[(i+j)%n])
+        tempLmfcc += list(lmfcc_train_x[(i+j)%n])
+    assert(len(tempMspec) == len(mspec_train_x[0])*7)
+    assert(len(tempLmfcc) == len(lmfcc_train_x[0])*7)
+
+    dmspec_train_x += [tempMspec]
+    dlmfcc_train_x += [tempLmfcc]
+
+for i in range(len(mspec_test_x)):
+    tempMspec = []
+    tempLmfcc = []
+    n = len(mspec_test_x)
+    for j in range(-3, 4):        
+        tempMspec += list(mspec_test_x[(i+j)%n])
+        tempLmfcc += list(lmfcc_test_x[(i+j)%n])
+    assert(len(tempMspec) == len(mspec_test_x[0])*7)
+    assert(len(tempLmfcc) == len(lmfcc_test_x[0])*7)
+
+    dmspec_test_x += [tempMspec]
+    dlmfcc_test_x += [tempLmfcc]
